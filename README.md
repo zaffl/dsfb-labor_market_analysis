@@ -4,10 +4,10 @@ In this repository you will find an example of data wrangling, data cleaning and
 In particular the analysis is based on dataset referring to the labor market of the region Lombardia, Italy.
 
 # Dataset Sources
+- Regione Lombardia
+- ISTAT
 
-The main datasets used are provided by Regione Lombardia available here and for other are taken from ISTAT
-Furthermore for another purpose ....
-More detail are available in the Jupyter Notebook
+More details are available in the Jupyter Notebook
 
 # Requirements and how to run the code
 In order to run this you simply need to install Python >= 3.6 and Anaconda. If you have already install Python on your PC you can simply run this command to install Anaconda:
@@ -19,4 +19,6 @@ Once you have done with it you can create a Conda Virtual Environment containing
 
     conda create labor -n env.yml python >= 3.6
 
-Then you can run ``jupyter-lab`` that will open the Jupyter Notebook in your browser
+Then you can open the Jupyter Notebook in your browser running in your terminal
+
+    jupyter-lab
