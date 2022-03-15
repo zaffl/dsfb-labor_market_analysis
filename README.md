@@ -1,6 +1,6 @@
 # Data Science for Business - Labor market analysis
 
-In this repository you will find an example of data wrangling, data cleaning and data analysis of the Labor Market Analysis. 
+In this repository you will find an example of data wrangling, data cleaning and data analysis focused on Labor Market. 
 In particular the analysis is based on dataset referring to the labor market of the region Lombardia, Italy.
 
 # Dataset Sources
