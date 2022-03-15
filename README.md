@@ -17,7 +17,7 @@ In order to run this you simply need to install Python >= 3.6 and Anaconda. If y
 Otherwise you can find some other ways to instal Anaconda on its [official site](https://anaconda.com/). 
 Once you have done with it you can create a Conda Virtual Environment containing all the necessary library using the following command:
 
-    conda create labor -n env.yml python >= 3.6
+    conda create dsfb -n env.yml python=3.8 & conda activate dsfb
 
 Then you can open the Jupyter Notebook in your browser running in your terminal
 
