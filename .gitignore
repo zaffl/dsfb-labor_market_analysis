@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Dataset Rapporti_di_lavoro_attivati.csv is ignored because is too big, run the jupyter notebook in orther to download it or run the script getDatasets.py
+/datasets/*
