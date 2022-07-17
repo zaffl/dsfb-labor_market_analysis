@@ -25,4 +25,4 @@ Then you can open the Jupyter Notebook in your browser running in your terminal
 # Presentation Slides
 In order to start the presentation install all requirements, and from the created environment run the following command:
 
-    jupyter nbconvert .\Presentation Slides.ipynb --to slides --post serve
+    jupyter nbconvert 'Presentation Slides.ipynb' --to slides --post serve
