@@ -9,21 +9,21 @@ In particular the analysis is based on dataset referring to the labor market of 
 More details are available in the Jupyter Notebook
 
 # Requirements and how to run the code - Method 1 - Conda
-1) In order to run this you simply need to install Python >= 3.6 and Anaconda. If you have already install Python on your PC you can simply run this command to install Anaconda:
+In order to run this you simply need to install Python >= 3.6 and Anaconda. If you have already install Python on your PC you can simply run this command to install Anaconda:
     
     pip install conda
 
-2) Otherwise you can find some other ways to instal Anaconda on its [official site](https://anaconda.com/). 
+Otherwise you can find some other ways to instal Anaconda on its [official site](https://anaconda.com/). 
 Once you have done with it you can create a Conda Virtual Environment containing all the necessary library using the following command:
 
     conda env create -f env.yml python=3.8 & conda activate dsfb
 
-3) Then you can open the Jupyter Notebook in your browser running in your terminal
+Then you can open the Jupyter Notebook in your browser running in your terminal
 
     jupyter-lab
 
 # Requirements and how to run the code - Method 2 - Python venv
-1) Creating virtual environments on MacOS or Linux:
+Creating virtual environments on MacOS or Linux:
 
 	python3 -m venv path_to_new_virtual_environment
 
@@ -31,7 +31,7 @@ On Windows:
 
 	python -m venv path_to_new_virtual_environment
 
-2) Start virtual environments on MacOS or Linux:
+Start virtual environments on MacOS or Linux:
 
     source path_to_new_virtual_environment/bin/activate
 
@@ -39,11 +39,11 @@ On Windows:
 
     path_to_new_virtual_environment\Scripts\activate
 
-3) Inside the enviroments run this command that will install all needed library:
+Inside the enviroments run this command that will install all needed library:
 
     pip install -r requirements.txt
 
-4) Then you can open the Jupyter Notebook in your browser running in your terminal
+Then you can open the Jupyter Notebook in your browser running in your terminal
 
     jupyter-lab
 
