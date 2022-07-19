@@ -46,7 +46,7 @@ def data_loading():
 
 
 
-#@st.cache(persist=True)
+@st.cache(persist=True)
 def data_cleaning(df_lav_att, df_lav_ces, df_ateco):
 
     df_lav_att_clean = df_lav_att.copy()
@@ -60,8 +60,6 @@ def data_cleaning(df_lav_att, df_lav_ces, df_ateco):
     df_lav_ces_clean['DATA'] = pd.to_datetime(df_lav_ces_clean['DATA'], format="%d/%m/%Y", errors='coerce')
     df_lav_ces_clean.dropna(subset=["DATA"], inplace=True)
     df_lav_ces_clean['DATA'] = df_lav_ces_clean['DATA'].apply(lambda x: x.strftime('%Y-%m'))
-
-    st.write(df_lav_ces_clean.head())
 
     # Remove record with Date < 01/2009 and Date > 12/2021
     from_date = "2009-01-01"
@@ -114,43 +112,48 @@ def data_cleaning(df_lav_att, df_lav_ces, df_ateco):
 
 
 
-#@st.cache(persist=True)
+@st.cache(persist=True)
 def prepare_kpi_economic_sector(df_lav_att, df_lav_ces):
     # Prepare Data
     df_att = df_lav_att.copy()
-    df_att = df_att.groupby(['SETTOREECONOMICODETTAGLIO'])['SETTOREECONOMICODETTAGLIO'].count().to_frame()
+    df_att = df_att.groupby(['MacroDescrizione', 'DATA'])['MacroDescrizione'].count().to_frame()
     df_att.columns.values[0] = "COUNT" 
     df_att.reset_index(inplace = True)
-    df_att.columns.values[0] = "SETTOREECONOMICODETTAGLIO"
-    
-    st.write(df_att.head())
+    df_att.columns.values[0] = "MacroDescrizione"
 
     df_ces = df_lav_ces.copy()
-    df_ces = df_ces.groupby(['SETTOREECONOMICODETTAGLIO'])['SETTOREECONOMICODETTAGLIO'].count().to_frame()
+    df_ces = df_ces.groupby(['MacroDescrizione', 'DATA'])['MacroDescrizione'].count().to_frame()
     df_ces.columns.values[0] = "COUNT" 
     df_ces.reset_index(inplace = True)
-    df_ces.columns.values[0] = "SETTOREECONOMICODETTAGLIO"
-
-    st.write(df_ces.head())
+    df_ces.columns.values[0] = "MacroDescrizione"
 
     df = pd.DataFrame()
-    df["SETTOREECONOMICODETTAGLIO"] = df_att["SETTOREECONOMICODETTAGLIO"]
+    df["DATA"] = df_lav_att["DATA"]
+    df["MacroDescrizione"] = df_att["MacroDescrizione"]
     df["DIFF"] = df_att["COUNT"] - df_ces["COUNT"]
+    df.sort_values("DIFF", inplace=True, ascending=False)
     return df
 
-def get_kpi_economic_sector(df_):
+def get_kpi_economic_sector(df_, start_date, end_date):
     df = df_.copy()
+
+    df = df.loc[(df["DATA"]>=str(start_date)) & (df["DATA"]<=str(end_date))]
+    df = df.groupby(['MacroDescrizione'])['MacroDescrizione'].count().to_frame()
+    df.columns.values[0] = "DIFF" 
+    df.reset_index(inplace = True)
+    df.columns.values[0] = "MacroDescrizione"
+    df.dropna(inplace=True)
+    df.sort_values("DIFF", inplace=True, ascending=False)
+
     df_best3 = df.head(3)
     df_worst3 = df.tail(3)
     return df_best3, df_worst3
 
 df_lav_att, df_lav_ces, df_ateco = data_loading()
-
 df_lav_att_clean, df_lav_ces_clean, df_ateco_clean = data_cleaning(df_lav_att, df_lav_ces, df_ateco)
 df_eco = prepare_kpi_economic_sector(df_lav_att_clean, df_lav_ces_clean)
 
-df_best3, df_worst3 = get_kpi_economic_sector(df_eco)
-st.write(df_lav_ces_clean.head())
+
 
 # Streamlit Page ###############################################################################################################################################
 
@@ -169,12 +172,14 @@ def apply_filter(df, start, end):
 # KPI3 --> 3 Best sectors of the years and 3 worst sectors of the years
 start, end = st.slider(label="", min_value=2011, max_value=2021, value=(2011, 2021))
 
-value = df_lav_att["SETTOREECONOMICODETTAGLIO"].shape
+df_best3, df_worst3 = get_kpi_economic_sector(df_eco, start, end)
+
+value = 0
 
 kpi1, kpi2, kpi3 = st.columns(3)
 
 with kpi1:
-    write_title("Creared Job")
+    write_title("Created Job")
     st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #66c2ff' align='center'>{value}</p>", unsafe_allow_html=True)
     st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #ff9999' align='center'>{value}</p>", unsafe_allow_html=True)
     
@@ -186,13 +191,31 @@ with kpi2:
     #st.selectbox(label="", options=["TIPO CONTRATTO 1", "TIPO CONTRATTO 2"])
     
 with kpi3:
+    eco1 = df_best3["MacroDescrizione"].iloc[0]
+    value1 = df_best3["DIFF"].iloc[0]
+    
+    eco2 = df_best3["MacroDescrizione"].iloc[1]
+    value2 = df_best3["DIFF"].iloc[1]
+    
+    eco3 = df_best3["MacroDescrizione"].iloc[2]
+    value3 = df_best3["DIFF"].iloc[2]
+    
+    eco4 = df_worst3["MacroDescrizione"].iloc[0]
+    value4 = df_worst3["DIFF"].iloc[0]
+    
+    eco5 = df_worst3["MacroDescrizione"].iloc[1]
+    value5 = df_worst3["DIFF"].iloc[1]
+    
+    eco6 = df_worst3["MacroDescrizione"].iloc[2]
+    value6 = df_worst3["DIFF"].iloc[2]
+
     write_title("Best / Worst Sector")
-    st.markdown(f"<p style='font-weight: bold; font-size: 15pt; color: #009900' align='center'>Economic Sector 1&nbsp;+{value}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 15pt; color: #009900' align='center'>Economic Sector 2&nbsp;+{value}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 15pt; color: #009900' align='center'>Economic Sector 3&nbsp;+{value}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 15pt; color: #ff3333' align='center'>Economic Sector 4&nbsp;-{value}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 15pt; color: #ff3333' align='center'>Economic Sector 5&nbsp;-{value}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 15pt; color: #ff3333' align='center'>Economic Sector 6&nbsp;-{value}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #009900' align='center'>{eco1}&nbsp;+{value1}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #009900' align='center'>{eco2}&nbsp;+{value2}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #009900' align='center'>{eco3}&nbsp;+{value3}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #ff3333' align='center'>{eco4}&nbsp;+{value4}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #ff3333' align='center'>{eco5}&nbsp;+{value5}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #ff3333' align='center'>{eco6}&nbsp;+{value6}</p>", unsafe_allow_html=True)
     
 st.markdown("""---""") 
 
