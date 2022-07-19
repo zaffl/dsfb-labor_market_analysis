@@ -134,10 +134,15 @@ def prepare_kpi_economic_sector(df_lav_att, df_lav_ces):
     df.sort_values("DIFF", inplace=True, ascending=False)
     return df
 
+def apply_filter(df_, start_date, end_date):
+    df = df_.copy()
+    df = df.loc[(df["DATA"]>=str(start_date)) & (df["DATA"]<=str(end_date))]
+    return df
+
+
 def get_kpi_economic_sector(df_, start_date, end_date):
     df = df_.copy()
-
-    df = df.loc[(df["DATA"]>=str(start_date)) & (df["DATA"]<=str(end_date))]
+    df = apply_filter(df_, start_date, end_date)
     df = df.groupby(['MacroDescrizione'])['MacroDescrizione'].count().to_frame()
     df.columns.values[0] = "DIFF" 
     df.reset_index(inplace = True)
@@ -149,10 +154,44 @@ def get_kpi_economic_sector(df_, start_date, end_date):
     df_worst3 = df.tail(3)
     return df_best3, df_worst3
 
+@st.cache(persist=True)
+def prepare_kpi_medium_age_contracts(df_att_, df_ces_):
+    dfa = df_att_.copy()
+    dfc = df_ces_.copy()
+
+    group_activated = dfa.groupby(["GENERE", "DATA"])["GENERE"].count().to_frame()
+    group_activated.columns.values[0] = "COUNT" 
+    group_activated.reset_index(inplace = True)
+    group_activated.columns.values[0] = "GENERE"
+
+    group_ceased = dfc.groupby(["GENERE", "DATA"])["GENERE"].count().to_frame()
+    group_ceased.columns.values[0] = "COUNT" 
+    group_ceased.reset_index(inplace = True)
+    group_ceased.columns.values[0] = "GENERE"
+
+    return group_activated, group_ceased
+
+def get_kpi_medium_age_contracts(df_att_, df_ces_, start_date, end_date):
+    dfa = df_att_.copy()
+    dfc = df_ces_.copy()
+    dfa = apply_filter(dfa, start_date, end_date)
+    dfc = apply_filter(dfc, start_date, end_date)
+
+    group = dfa.groupby(["GENERE"])["GENERE"].count()
+    male_activated = group[0]
+    female_activated = group[1]
+
+    group = dfc.groupby(["GENERE"])["GENERE"].count()
+    male_ceased = group[0]
+    female_ceased = group[1]
+
+    return male_activated, male_ceased, female_activated, female_ceased
+
+
 df_lav_att, df_lav_ces, df_ateco = data_loading()
 df_lav_att_clean, df_lav_ces_clean, df_ateco_clean = data_cleaning(df_lav_att, df_lav_ces, df_ateco)
 df_eco = prepare_kpi_economic_sector(df_lav_att_clean, df_lav_ces_clean)
-
+group_activated, group_ceased = prepare_kpi_medium_age_contracts(df_lav_att_clean, df_lav_ces_clean)
 
 
 # Streamlit Page ###############################################################################################################################################
@@ -171,8 +210,8 @@ def apply_filter(df, start, end):
 # KPI2 --> Medium Age of activated and ceased contracts
 # KPI3 --> 3 Best sectors of the years and 3 worst sectors of the years
 start, end = st.slider(label="", min_value=2011, max_value=2021, value=(2011, 2021))
-
-df_best3, df_worst3 = get_kpi_economic_sector(df_eco, start, end)
+#df_best3, df_worst3 = get_kpi_economic_sector(df_eco, start, end)
+male_activated, male_ceased, female_activated, female_ceased = get_kpi_medium_age_contracts(group_activated, group_ceased, start, end)
 
 value = 0
 
@@ -186,8 +225,8 @@ with kpi1:
 
 with kpi2:
     write_title("Medium Age Contracts")
-    st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #66c2ff' align='center'>{value}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #ff9999' align='center'>{value}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #66c2ff' align='center'>+{male_activated}</p>", unsafe_allow_html=True)
+    st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #ff9999' align='center'>+{female_activated}</p>", unsafe_allow_html=True)
     #st.selectbox(label="", options=["TIPO CONTRATTO 1", "TIPO CONTRATTO 2"])
     
 with kpi3:
