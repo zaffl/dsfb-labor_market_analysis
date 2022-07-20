@@ -1,9 +1,13 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
+
+import plotly.graph_objects as go
+import plotly.express as px
 
 import os
 import requests
+
+path = './datasets/'
 
 # Basic Page Configuration
 st.set_page_config(page_title = 'Job Market Dashboard', layout='wide', page_icon='')
@@ -12,139 +16,20 @@ st.set_page_config(page_title = 'Job Market Dashboard', layout='wide', page_icon
 
 @st.cache(persist=True)
 def data_loading():
-    path = "./datasets/"
-    datasets = [
-        {# Activated Contracts Dataset
-            'url' : 'https://dati.lombardia.it/api/views/qbau-cyuc/rows.csv?accessType=DOWNLOAD',
-            'filename' : 'Rapporti_di_lavoro_attivati.csv'
-        },
-        {# Ceased Contracts Dataset
-            'url' : 'https://www.dati.lombardia.it/api/views/nwz3-p6vm/rows.csv?accessType=DOWNLOAD',
-            'filename' : 'Rapporti_di_lavoro_cessati.csv'
-        },
-        {# ATECO Code Dataset
-            'url' : 'https://www.istat.it/it/files//2022/03/Struttura-ATECO-2007-aggiornamento-2022.xlsx',
-            'filename' : 'Struttura-ATECO-2007-aggiornamento-2022.xlsx'
-        },
-    ]
+    df_eco = pd.read_csv(path + "kpi_eco.csv")
+    group_activated = pd.read_csv(path + "activated.csv")
+    group_ceased = pd.read_csv(path + "ceased.csv")
+    age_activated = pd.read_csv(path + "kpi_age.csv")
+    df_charts = pd.read_csv(path + "charts.csv")
 
-    # Create datasets dir
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-    # Retrive datasets
-    for dataset in datasets:
-        if not os.path.exists(path + dataset["filename"]):
-            r = requests.get(dataset["url"], allow_redirects=True)
-            open(path + dataset["filename"], 'wb').write(r.content)
-
-    df_lav_att = pd.read_csv(path + "Rapporti_di_lavoro_attivati.csv")
-    df_lav_ces = pd.read_csv(path + "Rapporti_di_lavoro_cessati.csv")
-    df_ateco = pd.read_excel(path + "Struttura-ATECO-2007-aggiornamento-2022.xlsx", engine="openpyxl")
-
-    return df_lav_att, df_lav_ces, df_ateco
-
-
-
-@st.cache(persist=True)
-def data_cleaning(df_lav_att, df_lav_ces, df_ateco):
-
-    df_lav_att_clean = df_lav_att.copy()
-    df_lav_ces_clean = df_lav_ces.copy()
-    df_ateco_clean = df_ateco.copy()
-
-    df_lav_att_clean['DATA'] = pd.to_datetime(df_lav_att_clean['DATA'], format="%d/%m/%Y", errors='coerce')
-    df_lav_att_clean.dropna(subset=["DATA"], inplace=True)
-    df_lav_att_clean['DATA'] = df_lav_att_clean['DATA'].apply(lambda x: x.strftime('%Y-%m'))
-
-    df_lav_ces_clean['DATA'] = pd.to_datetime(df_lav_ces_clean['DATA'], format="%d/%m/%Y", errors='coerce')
-    df_lav_ces_clean.dropna(subset=["DATA"], inplace=True)
-    df_lav_ces_clean['DATA'] = df_lav_ces_clean['DATA'].apply(lambda x: x.strftime('%Y-%m'))
-
-    # Remove record with Date < 01/2009 and Date > 12/2021
-    from_date = "2009-01-01"
-    to_date = "2021-12-31"
-    df_lav_att_clean = df_lav_att_clean.loc[(df_lav_att_clean["DATA"]>=from_date) & (df_lav_att_clean["DATA"]<=to_date)]
-    df_lav_ces_clean = df_lav_ces_clean.loc[(df_lav_ces_clean["DATA"]>=from_date) & (df_lav_ces_clean["DATA"]<=to_date)]
-
-    # Remove punctuations
-    df_lav_att_clean["SETTOREECONOMICODETTAGLIO"] = df_lav_att_clean["SETTOREECONOMICODETTAGLIO"].str.replace(r'[^\w\s]', '')
-    df_lav_ces_clean["SETTOREECONOMICODETTAGLIO"] = df_lav_ces_clean["SETTOREECONOMICODETTAGLIO"].str.replace(r'[^\w\s]', '')
-
-    # Fill null values of the column MODALITALAVORO
-    df_lav_att_clean["MODALITALAVORO"].fillna("SCONOSCIUTO", inplace=True)
-    # Drop null values
-    df_lav_att_clean.dropna(inplace=True)
-    df_lav_ces_clean.dropna(inplace=True)
-
-    # Rename some columns
-    df_ateco_clean.rename(columns={"Titolo Ateco 2007 aggiornamento 2022" : "DescrizioneAteco"}, inplace=True)  
-    df_ateco_clean.columns.values[0] = "CodAteco"
-    
-
-    # Remove punctuations
-    df_ateco_clean["DescrizioneAteco"] = df_ateco_clean["DescrizioneAteco"].str.replace(r'[^\w\s]', '')
-
-    # Create new features
-    df_ateco_clean.insert(2, "MacroAteco", "")
-    df_ateco_clean.insert(3, "MacroDescrizione", "")
-    df_ateco_clean["MacroAteco"] = df_ateco_clean.apply(lambda x: x["CodAteco"] if x["CodAteco"].isalpha() else "", axis=1)
-    df_ateco_clean["MacroDescrizione"] = df_ateco_clean.apply(lambda x: x["DescrizioneAteco"] if x["CodAteco"].isalpha() else "", axis=1)
-
-    macro_cod = ""
-    macro_desc = ""
-    for x in df_ateco_clean.index:
-        if df_ateco_clean["MacroAteco"][x] == "":
-            df_ateco_clean["MacroAteco"][x] = macro_cod
-            df_ateco_clean["MacroDescrizione"][x] = macro_desc
-        else:
-            macro_cod = df_ateco_clean["MacroAteco"][x]
-            macro_desc = df_ateco_clean["MacroDescrizione"][x]
-
-    # Delete unwanted duplicates (e.g. CodAteco 90.1 and 90.1.0, are the same)
-    df_ateco_clean.drop_duplicates(subset=['DescrizioneAteco'], inplace=True)
-
-    # Merge
-    df_lav_att_clean = pd.merge(df_lav_att_clean, df_ateco_clean, how="left", left_on="SETTOREECONOMICODETTAGLIO", right_on="DescrizioneAteco")
-    df_lav_ces_clean = pd.merge(df_lav_ces_clean, df_ateco_clean, how="left", left_on="SETTOREECONOMICODETTAGLIO", right_on="DescrizioneAteco")
-
-    return df_lav_att_clean, df_lav_ces_clean, df_ateco_clean
-
-
-
-@st.cache(persist=True)
-def prepare_kpi_economic_sector(df_lav_att, df_lav_ces):
-    # Prepare Data
-    df_att = df_lav_att.copy()
-    df_att = df_att.groupby(['MacroDescrizione', 'DATA'])['MacroDescrizione'].count().to_frame()
-    df_att.columns.values[0] = "COUNT" 
-    df_att.reset_index(inplace = True)
-    df_att.columns.values[0] = "MacroDescrizione"
-
-    df_ces = df_lav_ces.copy()
-    df_ces = df_ces.groupby(['MacroDescrizione', 'DATA'])['MacroDescrizione'].count().to_frame()
-    df_ces.columns.values[0] = "COUNT" 
-    df_ces.reset_index(inplace = True)
-    df_ces.columns.values[0] = "MacroDescrizione"
-
-    df = pd.DataFrame()
-    df["DATA"] = df_lav_att["DATA"]
-    df["MacroDescrizione"] = df_att["MacroDescrizione"]
-    df["DIFF"] = df_att["COUNT"] - df_ces["COUNT"]
-    df.sort_values("DIFF", inplace=True, ascending=False)
-    return df
-
-def apply_filter(df_, start_date, end_date):
-    df = df_.copy()
-    df = df.loc[(df["DATA"]>=str(start_date)) & (df["DATA"]<=str(end_date))]
-    return df
-
+    return df_eco, group_activated, group_ceased, age_activated, df_charts
 
 def get_kpi_economic_sector(df_, start_date, end_date):
     df = df_.copy()
-    df = apply_filter(df_, start_date, end_date)
-    df = df.groupby(['MacroDescrizione'])['MacroDescrizione'].count().to_frame()
-    df.columns.values[0] = "DIFF" 
+    df = df.loc[(df["DATA"]>=str(start_date)) & (df["DATA"]<=str(end_date))]
+    
+    df = df.groupby(['MacroDescrizione'])['DIFF'].sum().to_frame()
+    #df.columns.values[0] = "DIFF" 
     df.reset_index(inplace = True)
     df.columns.values[0] = "MacroDescrizione"
     df.dropna(inplace=True)
@@ -154,119 +39,162 @@ def get_kpi_economic_sector(df_, start_date, end_date):
     df_worst3 = df.tail(3)
     return df_best3, df_worst3
 
-@st.cache(persist=True)
-def prepare_kpi_medium_age_contracts(df_att_, df_ces_):
+def get_kpi_act_ces_contracts(df_att_, df_ces_, start_date, end_date):
     dfa = df_att_.copy()
     dfc = df_ces_.copy()
 
-    group_activated = dfa.groupby(["GENERE", "DATA"])["GENERE"].count().to_frame()
-    group_activated.columns.values[0] = "COUNT" 
-    group_activated.reset_index(inplace = True)
-    group_activated.columns.values[0] = "GENERE"
+    dfa = dfa.loc[(dfa["DATA"]>=str(start_date)) & (dfa["DATA"]<=str(end_date))]
+    dfc = dfc.loc[(dfc["DATA"]>=str(start_date)) & (dfc["DATA"]<=str(end_date))]
 
-    group_ceased = dfc.groupby(["GENERE", "DATA"])["GENERE"].count().to_frame()
-    group_ceased.columns.values[0] = "COUNT" 
-    group_ceased.reset_index(inplace = True)
-    group_ceased.columns.values[0] = "GENERE"
+    dfa = dfa.groupby(["GENERE"])["COUNT"].sum().to_frame()
+    dfa.columns.values[0] = "COUNT" 
+    dfa.reset_index(inplace = True)
+    dfa.columns.values[0] = "GENERE"
+    male_activated = dfa.loc[(dfa["GENERE"] == "M")]
+    male_activated = male_activated["COUNT"].values[0]
+    female_activated = dfa.loc[(dfa["GENERE"] == "F")]
+    female_activated = female_activated["COUNT"].values[0]
 
-    return group_activated, group_ceased
-
-def get_kpi_medium_age_contracts(df_att_, df_ces_, start_date, end_date):
-    dfa = df_att_.copy()
-    dfc = df_ces_.copy()
-    dfa = apply_filter(dfa, start_date, end_date)
-    dfc = apply_filter(dfc, start_date, end_date)
-
-    group = dfa.groupby(["GENERE"])["GENERE"].count()
-    male_activated = group[0]
-    female_activated = group[1]
-
-    group = dfc.groupby(["GENERE"])["GENERE"].count()
-    male_ceased = group[0]
-    female_ceased = group[1]
+    dfc = dfc.groupby(["GENERE"])["COUNT"].sum().to_frame()
+    dfc.columns.values[0] = "COUNT" 
+    dfc.reset_index(inplace = True)
+    dfc.columns.values[0] = "GENERE"
+    male_ceased = dfc.loc[(dfc["GENERE"] == "M")]
+    male_ceased = male_ceased["COUNT"].values[0]
+    female_ceased = dfc.loc[(dfc["GENERE"] == "F")]
+    female_ceased = female_ceased["COUNT"].values[0]
 
     return male_activated, male_ceased, female_activated, female_ceased
 
+def get_kpi_medium_age_contracts(df_att_, start_date, end_date):
+    dfa = df_att_.copy()
 
-df_lav_att, df_lav_ces, df_ateco = data_loading()
-df_lav_att_clean, df_lav_ces_clean, df_ateco_clean = data_cleaning(df_lav_att, df_lav_ces, df_ateco)
-df_eco = prepare_kpi_economic_sector(df_lav_att_clean, df_lav_ces_clean)
-group_activated, group_ceased = prepare_kpi_medium_age_contracts(df_lav_att_clean, df_lav_ces_clean)
+    dfa = dfa.loc[(dfa["DATA"]>=str(start_date)) & (dfa["DATA"]<=str(end_date))]
 
+    dfa = dfa.groupby(["GENERE"])["AVG"].mean().to_frame()
+    dfa.columns.values[0] = "AVG" 
+    dfa.reset_index(inplace = True)
+    dfa.columns.values[0] = "GENERE"
+
+    medium_male_age = dfa.loc[(dfa["GENERE"] == "M")]
+    medium_male_age = round(medium_male_age["AVG"].values[0], 2)
+    medium_female_age = dfa.loc[(dfa["GENERE"] == "F")]
+    medium_female_age = round(medium_female_age["AVG"].values[0], 2)
+
+    return medium_male_age, medium_female_age
+
+
+def get_charts(df_charts, start_date, end_date):
+    df_chart = df_charts.copy()
+    df_chart = df_chart.loc[(df_chart["DATA"]>=str(start_date)) & (df_chart["DATA"]<=str(end_date))]
+    return df_chart
+
+
+if not os.path.exists(path + "kpi_eco.csv") or not os.path.exists(path + "activated.csv") or not os.path.exists(path + "ceased.csv") or not os.path.exists(path + "kpi_age.csv") or not os.path.exists(path + "charts.csv"):
+    os.system("prepare_data_for_dashboard.py")
+
+df_eco, group_activated, group_ceased, age_activated, df_charts = data_loading()
 
 # Streamlit Page ###############################################################################################################################################
 
 def write_title(text):
     st.markdown(f"<p style='font-weight: bold; font-size: 30pt' align='center'>{text}</p>", unsafe_allow_html=True)
 
-def apply_filter(df, start, end):
-    df
-
-
-
-
 
 # KPI1 --> Male / Female activated and ceased contracts
-# KPI2 --> Medium Age of activated and ceased contracts
+# KPI2 --> Medium Age of activated contracts
 # KPI3 --> 3 Best sectors of the years and 3 worst sectors of the years
-start, end = st.slider(label="", min_value=2011, max_value=2021, value=(2011, 2021))
-#df_best3, df_worst3 = get_kpi_economic_sector(df_eco, start, end)
-male_activated, male_ceased, female_activated, female_ceased = get_kpi_medium_age_contracts(group_activated, group_ceased, start, end)
-
-value = 0
-
-kpi1, kpi2, kpi3 = st.columns(3)
-
-with kpi1:
-    write_title("Created Job")
-    st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #66c2ff' align='center'>{value}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #ff9999' align='center'>{value}</p>", unsafe_allow_html=True)
+start, end = st.slider(label="", min_value=2011, max_value=2021, value=(2011, 2021), step=1)
     
+try:
+    df_best3, df_worst3 = get_kpi_economic_sector(df_eco, start, end)
+    male_activated, male_ceased, female_activated, female_ceased = get_kpi_act_ces_contracts(group_activated, group_ceased, start, end)
+    medium_male_age, medium_female_age = get_kpi_medium_age_contracts(age_activated, start, end)
+    df_chart = get_charts(df_charts, start, end)
 
-with kpi2:
-    write_title("Medium Age Contracts")
-    st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #66c2ff' align='center'>+{male_activated}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #ff9999' align='center'>+{female_activated}</p>", unsafe_allow_html=True)
-    #st.selectbox(label="", options=["TIPO CONTRATTO 1", "TIPO CONTRATTO 2"])
-    
-with kpi3:
-    eco1 = df_best3["MacroDescrizione"].iloc[0]
-    value1 = df_best3["DIFF"].iloc[0]
-    
-    eco2 = df_best3["MacroDescrizione"].iloc[1]
-    value2 = df_best3["DIFF"].iloc[1]
-    
-    eco3 = df_best3["MacroDescrizione"].iloc[2]
-    value3 = df_best3["DIFF"].iloc[2]
-    
-    eco4 = df_worst3["MacroDescrizione"].iloc[0]
-    value4 = df_worst3["DIFF"].iloc[0]
-    
-    eco5 = df_worst3["MacroDescrizione"].iloc[1]
-    value5 = df_worst3["DIFF"].iloc[1]
-    
-    eco6 = df_worst3["MacroDescrizione"].iloc[2]
-    value6 = df_worst3["DIFF"].iloc[2]
 
-    write_title("Best / Worst Sector")
-    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #009900' align='center'>{eco1}&nbsp;+{value1}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #009900' align='center'>{eco2}&nbsp;+{value2}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #009900' align='center'>{eco3}&nbsp;+{value3}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #ff3333' align='center'>{eco4}&nbsp;+{value4}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #ff3333' align='center'>{eco5}&nbsp;+{value5}</p>", unsafe_allow_html=True)
-    st.markdown(f"<p style='font-weight: bold; font-size: 10pt; color: #ff3333' align='center'>{eco6}&nbsp;+{value6}</p>", unsafe_allow_html=True)
-    
-st.markdown("""---""") 
+    value = 0
 
-first_chart, second_chart = st.columns(2)
+    kpi1, kpi2, kpi3 = st.columns(3)
 
-with first_chart:
-    write_title("Chart 1")
-    chart_data = pd.DataFrame(np.random.randn(20, 3),columns=['a', 'b', 'c'])
-    st.line_chart(chart_data)
+    with kpi1:
+        write_title("Activated / Ceased Contracts")
+        st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #66c2ff' align='center'>+{male_activated}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-{male_ceased}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #ff9999' align='center'>+{female_activated}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-{female_ceased}</p>", unsafe_allow_html=True)
+        
+    with kpi2:
+        write_title("Medium Age Activated Contracts")
+        st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #66c2ff' align='center'>{medium_male_age}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-weight: bold; font-size: 25pt; color: #ff9999' align='center'>{medium_female_age}</p>", unsafe_allow_html=True)
+    with kpi3:
+        eco1 = df_best3["MacroDescrizione"].iloc[0]
+        value1 = df_best3["DIFF"].iloc[0]
+        
+        eco2 = df_best3["MacroDescrizione"].iloc[1]
+        value2 = df_best3["DIFF"].iloc[1]
+        
+        eco3 = df_best3["MacroDescrizione"].iloc[2]
+        value3 = df_best3["DIFF"].iloc[2]
+        
+        eco4 = df_worst3["MacroDescrizione"].iloc[0]
+        value4 = df_worst3["DIFF"].iloc[0]
+        
+        eco5 = df_worst3["MacroDescrizione"].iloc[1]
+        value5 = df_worst3["DIFF"].iloc[1]
+        
+        eco6 = df_worst3["MacroDescrizione"].iloc[2]
+        value6 = df_worst3["DIFF"].iloc[2]
 
-with second_chart:
-    write_title("Chart 2")
-    chart_data = pd.DataFrame(np.random.randn(20, 3),columns=['a', 'b', 'c'])
-    st.line_chart(chart_data)
+        write_title("Best / Worst Sector")
+        st.markdown(f"<p style='font-weight: bold; font-size: 12pt; color: #009900' align='center'>{eco1}&nbsp;{value1}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-weight: bold; font-size: 12pt; color: #009900' align='center'>{eco2}&nbsp;{value2}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-weight: bold; font-size: 12pt; color: #009900' align='center'>{eco3}&nbsp;{value3}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-weight: bold; font-size: 12pt; color: rgb(255, 75, 75)' align='center'>{eco4}&nbsp;{value4}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-weight: bold; font-size: 12pt; color: rgb(255, 75, 75)' align='center'>{eco5}&nbsp;{value5}</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='font-weight: bold; font-size: 12pt; color: rgb(255, 75, 75)' align='center'>{eco6}&nbsp;{value6}</p>", unsafe_allow_html=True)
+        
+    st.markdown("""---""") 
 
+    first_chart, second_chart = st.columns(2)
+
+    with first_chart:
+        write_title("Activated / Ceased Contracts")
+        df_chart1 = pd.DataFrame()
+        df_chart1["DATA"] = df_chart["DATA"]
+        df_chart1["ACTIVATED"] = df_chart["ACTIVATED"]
+        df_chart1["CEASED"] = df_chart["CEASED"]
+
+        fig = px.line(        
+            df_chart1,
+            x = "DATA",
+            y = ["ACTIVATED", "CEASED"],
+            width = 900,
+            height = 400
+        )
+        st.plotly_chart(fig)
+
+        #df_chart1.set_index("DATA", inplace=True)
+        #st.line_chart(df_chart1)
+
+    with second_chart:
+        write_title("New Jobs Created")
+        df_chart2 = pd.DataFrame()
+        df_chart2["DATA"] = df_chart["DATA"]
+        df_chart2["DIFF"] = df_chart["DIFF"]
+
+        fig = px.line(        
+            df_chart2,
+            x = "DATA",
+            y = "DIFF",
+            width = 900,
+            height = 400
+        )
+        st.plotly_chart(fig)
+
+        #st.line_chart(df_chart2)
+        #df_chart2.set_index("DATA", inplace=True)
+
+    st.markdown("""---""")
+
+except:
+    st.error("Please select start date different from end date")
