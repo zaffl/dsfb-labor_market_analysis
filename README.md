@@ -45,7 +45,7 @@ Inside the enviroments run this command that will install all needed library:
 
 Then you can open the Jupyter Notebook in your browser running in your terminal
 
-    jupyter-lab
+    jupyter-notebook
 
 # Presentation Slides
 In order to start the presentation install all requirements, and from the created environment run the following command:
