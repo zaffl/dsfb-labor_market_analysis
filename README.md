@@ -1,7 +1,7 @@
-# Data Science for Business - Labor market analysis
+# Data Science for Business - Job market analysis
 
-In this repository you will find an example of data cleaning and statistics focused on Labor Market. 
-In particular the analysis is based on dataset referring to the labor market of the region Lombardia, Italy.
+In this repository you will find an example of data cleaning and statistics focused on Job Market. 
+In particular the analysis is based on dataset referring to the job market of the region Lombardia, Italy.
 
 # Dataset Sources
 - Regione Lombardia
